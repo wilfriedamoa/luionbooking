@@ -82,7 +82,7 @@ public class UserService {
             userRepository.save(userM);
         }
         log.info("generation de code otp");
-        boolean sendMail = Utility.sendMailWithResend("onboarding@resend.dev", form.getEmail(),
+        boolean sendMail = Utility.sendMailWithResend("support.lunionbooking@lunion-lab.com", form.getEmail(),
                 "Verify Email", codeOtp);
         if (sendMail) {
             log.info("send mail");
