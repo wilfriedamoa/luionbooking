@@ -5,15 +5,23 @@ import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 
+import com.lunionlab.booking.models.ProfileModel;
+import com.lunionlab.booking.services.ProfileService;
 import com.resend.Resend;
 import com.resend.services.emails.model.CreateEmailOptions;
 import com.resend.services.emails.model.CreateEmailResponse;
 
+import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
 public class Utility {
+
+    private static ProfileService profileService;
 
     public static Date dateFromInteger(Integer number, TemporalUnit unit) {
         Date now = new Date();
@@ -27,6 +35,18 @@ public class Utility {
         // format = "dd-MM-yyyy";
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat(format);
         return simpleDateFormat.format(date);
+    }
+
+    public static Date dateFromString(String date) {
+        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+
+        try {
+            Date d = dateFormat.parse(date);
+            return d;
+        } catch (ParseException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public static String hashPassword(String password) {
@@ -137,5 +157,18 @@ public class Utility {
         Pattern emailPattern = Pattern.compile(EMAIL_REGEX);
         Matcher matcher = emailPattern.matcher(email);
         return matcher.matches();
+    }
+
+    public static ProfileModel getUserAuth() {
+        Authentication authUser = SecurityContextHolder.getContext().getAuthentication();
+        String email = authUser.getName();
+        System.out.println(email);
+        return profileService.getProfileByEmail(email);
+    }
+
+    public static String getUserAuthEmail() {
+        Authentication authUser = SecurityContextHolder.getContext().getAuthentication();
+        String email = authUser.getName();
+        return email;
     }
 }

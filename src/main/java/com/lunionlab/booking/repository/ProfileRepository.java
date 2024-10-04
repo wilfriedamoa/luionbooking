@@ -10,4 +10,6 @@ public interface ProfileRepository extends JpaRepository<ProfileModel, UUID> {
 
     Optional<ProfileModel> findFirstByEmailAndDeleted(String email, Boolean deleted);
 
+    Optional<ProfileModel> findFirstByIdAndDeleted(UUID id, Boolean deleted);
+
 }

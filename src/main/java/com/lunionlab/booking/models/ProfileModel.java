@@ -30,7 +30,8 @@ public class ProfileModel extends BaseModel {
     private String documentType;
 
     public ProfileModel(String firstName, String lastName, String country, String city, Date birthDate, String email,
-            String bio, String address, String phoneNumber, String job, String gender, String documentType) {
+            String bio, String address, String phoneNumber, String job, String gender, String documentType,
+            String avatarUrl) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.country = country;
@@ -43,6 +44,7 @@ public class ProfileModel extends BaseModel {
         this.job = job;
         this.gender = gender;
         this.documentType = documentType;
+        this.avatarUrl = avatarUrl;
     }
 
 }

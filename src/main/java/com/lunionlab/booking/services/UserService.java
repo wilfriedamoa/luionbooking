@@ -9,12 +9,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.validation.BindingResult;
 
 import com.lunionlab.booking.emum.DeletionEnum;
+import com.lunionlab.booking.emum.StatusEnum;
 import com.lunionlab.booking.form.AuthForm;
+import com.lunionlab.booking.form.GoogleLogin;
 import com.lunionlab.booking.form.VerifyOPT;
 import com.lunionlab.booking.models.CodeOtpModel;
+import com.lunionlab.booking.models.ProfileModel;
 import com.lunionlab.booking.models.RefreshTokenModel;
 import com.lunionlab.booking.models.UserModel;
 import com.lunionlab.booking.repository.CodeOtpRespository;
+import com.lunionlab.booking.repository.ProfileRepository;
 import com.lunionlab.booking.repository.UserRepository;
 import com.lunionlab.booking.response.AuthResponse;
 import com.lunionlab.booking.utilities.ReportError;
@@ -24,6 +28,8 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.time.temporal.ChronoUnit;
 
@@ -54,6 +60,9 @@ public class UserService {
     @Autowired
     RefreshTokenService refreshTokenService;
 
+    @Autowired
+    ProfileRepository profileRepository;
+
     public UserModel getUserByEmail(String email) {
         return userRepository.findFirstByEmailAndDeleted(email, DeletionEnum.DELETED_NO).orElse(null);
     }
@@ -78,7 +87,7 @@ public class UserService {
         } else {
             codeOtpRespository.save(saveCode);
             UserModel userM = new UserModel(form.getEmail(),
-                    Utility.hashPassword(codeOtp));
+                    Utility.hashPassword(codeOtp), StatusEnum.NEW_USER);
             userRepository.save(userM);
         }
         log.info("generation de code otp");
@@ -98,6 +107,7 @@ public class UserService {
             log.error("mauvais format de données");
             return ResponseEntity.badRequest().body(ReportError.getErrors(result));
         }
+        Map<String, Object> authRes = new HashMap<>();
         Optional<CodeOtpModel> codeOpt = codeOtpRespository.findFirstByCodeAndDeleted(form.getCode(),
                 DeletionEnum.DELETED_NO);
         if (codeOpt.isEmpty()) {
@@ -106,23 +116,83 @@ public class UserService {
                     .body(ReportError.message("message", "code saisi incorrecte", "code", "C11"));
         }
         CodeOtpModel codeOtpModel = codeOpt.get();
+        UserModel userModel = this.getUserByEmail(codeOtpModel.getEmail());
         Date now = new Date();
 
         if (codeOtpModel.getExpiration().compareTo(now) < 0) {
             log.error("code expiré");
             return ResponseEntity.badRequest().body(ReportError.message("message", "le code a expiré", "code", "C10"));
         }
+        if (userModel.getStatus().intValue() == StatusEnum.NEW_USER.intValue()) {
+            authRes.put("userState", "new");
+            userModel.setStatus(StatusEnum.OLD_USER);
+            userRepository.save(userModel);
+
+            String token = jwtService.generateToken(codeOtpModel.getEmail());
+            RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(codeOtpModel.getEmail());
+            AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
+            codeOtpRespository.delete(codeOtpModel);
+            authRes.put("authResponse", authResponse);
+            return ResponseEntity.ok(authRes);
+        }
+
+        if (userModel.getStatus().intValue() == StatusEnum.OLD_USER.intValue()) {
+            authRes.put("userState", "old");
+        }
         String token = jwtService.generateToken(codeOtpModel.getEmail());
         RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(codeOtpModel.getEmail());
         AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
         codeOtpRespository.delete(codeOtpModel);
-
-        return ResponseEntity.ok(authResponse);
+        authRes.put("authResponse", authResponse);
+        return ResponseEntity.ok(authRes);
     }
 
     public Object getUserAuth() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String email = auth.getName();
         return ResponseEntity.ok(profileService.getProfileByEmail(email));
+    }
+
+    public Object googleLogin(@Valid GoogleLogin form, BindingResult result) {
+        if (result.hasErrors()) {
+            log.error("mauvais format des données");
+            return ResponseEntity.badRequest().body(ReportError.getErrors(result));
+        }
+        Map<String, Object> response = new HashMap<>();
+        if (Utility.verifyEmail(form.getEmail()) == false) {
+            log.error("email non valide");
+            return ResponseEntity.badRequest().body(ReportError.message("message", "email invalide", "code", "E11"));
+        }
+        UserModel userModel = this.getUserByEmail(form.getEmail());
+        if (userModel == null) {
+            userModel = new UserModel(form.getEmail(), Utility.hashPassword(form.getEmail()), StatusEnum.NEW_USER);
+            userModel = userRepository.save(userModel);
+        }
+        ProfileModel profileModel = profileService.getProfileByEmail(userModel.getEmail());
+        if (profileModel == null) {
+            profileModel = new ProfileModel(null, null, null, null, null, form.getEmail(), null, null, null, null, null,
+                    null, form.getAvatarUrl());
+            profileModel = profileRepository.save(profileModel);
+        }
+        if (userModel.getStatus().intValue() == StatusEnum.NEW_USER.intValue()) {
+            response.put("userState", "new");
+            userModel.setStatus(StatusEnum.OLD_USER);
+            userRepository.save(userModel);
+
+            String token = jwtService.generateToken(userModel.getEmail());
+            RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(userModel.getEmail());
+            AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
+            response.put("authResponse", authResponse);
+            return ResponseEntity.ok(response);
+        }
+        if (userModel.getStatus().intValue() == StatusEnum.OLD_USER.intValue()) {
+            response.put("userState", "old");
+        }
+
+        String token = jwtService.generateToken(userModel.getEmail());
+        RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(userModel.getEmail());
+        AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
+        response.put("authResponse", authResponse);
+        return ResponseEntity.ok(response);
     }
 }

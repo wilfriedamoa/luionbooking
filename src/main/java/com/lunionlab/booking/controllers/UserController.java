@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.lunionlab.booking.form.AuthForm;
+import com.lunionlab.booking.form.GoogleLogin;
 import com.lunionlab.booking.form.RefreshTokenForm;
 import com.lunionlab.booking.form.VerifyOPT;
 import com.lunionlab.booking.services.RefreshTokenService;
@@ -44,5 +45,10 @@ public class UserController {
     @PostMapping("/refresh/token")
     public Object refreshToken(@Valid @RequestBody RefreshTokenForm form, BindingResult result) {
         return refreshTokenService.refreshToken(form, result);
+    }
+
+    @PostMapping("/google")
+    public Object googleLogin(@Valid @RequestBody GoogleLogin form, BindingResult result) {
+        return userService.googleLogin(form, result);
     }
 }

@@ -36,7 +36,7 @@ public class WebSecurityConfig {
 
         httpSecurity.authorizeHttpRequests(auth -> {
             auth.requestMatchers("/test/**", "/error", "/api/auth/user", "/api/auth/code/verification",
-                    "/api/auth/refresh/token").permitAll()
+                    "/api/auth/refresh/token", "/api/auth/google").permitAll()
                     .anyRequest().authenticated();
         });
 

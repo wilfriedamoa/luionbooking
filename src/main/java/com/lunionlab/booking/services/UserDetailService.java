@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import com.lunionlab.booking.emum.JwtAudience;
 import com.lunionlab.booking.models.UserModel;
-import com.lunionlab.booking.repository.ProfileRepository;
 
 import java.util.Map;
 import java.util.List;

@@ -15,9 +15,10 @@ public class UserModel extends BaseModel {
     private String email;
     private String password;
 
-    public UserModel(String email, String password) {
+    public UserModel(String email, String password, Integer status) {
         this.email = email;
         this.password = password;
+        this.status = status;
     }
 
 }

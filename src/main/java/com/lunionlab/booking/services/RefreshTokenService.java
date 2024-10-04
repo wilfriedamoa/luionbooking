@@ -45,6 +45,11 @@ public class RefreshTokenService {
 
     public RefreshTokenModel createRefreshToken(String email) {
         Optional<UserModel> userModel = userRepository.findFirstByEmailAndDeleted(email, DeletionEnum.DELETED_NO);
+        Optional<RefreshTokenModel> refreshOpt = refreshTokenRepository.findFirstByUserAndDeleted(userModel.get(),
+                DeletionEnum.DELETED_NO);
+        if (refreshOpt.isPresent()) {
+            return refreshOpt.get();
+        }
         RefreshTokenModel refreshTokenModel = new RefreshTokenModel(UUID.randomUUID().toString(),
                 Utility.dateFromInteger(REFRESH_DELAY, ChronoUnit.DAYS), userModel.get());
         refreshTokenModel = refreshTokenRepository.save(refreshTokenModel);
