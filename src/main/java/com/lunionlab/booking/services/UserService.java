@@ -132,7 +132,8 @@ public class UserService {
             RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(codeOtpModel.getEmail());
             AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
             codeOtpRespository.delete(codeOtpModel);
-            authRes.put("authResponse", authResponse);
+            authRes.put("accessToken", authResponse.getAccessToken());
+            authRes.put("refreshToken", authResponse.getRefreshToken());
             return ResponseEntity.ok(authRes);
         }
 
@@ -143,7 +144,8 @@ public class UserService {
         RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(codeOtpModel.getEmail());
         AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
         codeOtpRespository.delete(codeOtpModel);
-        authRes.put("authResponse", authResponse);
+        authRes.put("accessToken", authResponse.getAccessToken());
+        authRes.put("refreshToken", authResponse.getRefreshToken());
         return ResponseEntity.ok(authRes);
     }
 
@@ -182,7 +184,8 @@ public class UserService {
             String token = jwtService.generateToken(userModel.getEmail());
             RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(userModel.getEmail());
             AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
-            response.put("authResponse", authResponse);
+            response.put("accessToken", authResponse.getAccessToken());
+            response.put("refreshToken", authResponse.getRefreshToken());
             return ResponseEntity.ok(response);
         }
         if (userModel.getStatus().intValue() == StatusEnum.OLD_USER.intValue()) {
@@ -192,7 +195,8 @@ public class UserService {
         String token = jwtService.generateToken(userModel.getEmail());
         RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(userModel.getEmail());
         AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
-        response.put("authResponse", authResponse);
+        response.put("accessToken", authResponse.getAccessToken());
+        response.put("refreshToken", authResponse.getRefreshToken());
         return ResponseEntity.ok(response);
     }
 }
