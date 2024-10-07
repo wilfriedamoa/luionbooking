@@ -1,5 +1,7 @@
 package com.lunionlab.booking.services;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -9,9 +11,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.lunionlab.booking.emum.DeletionEnum;
+import com.lunionlab.booking.emum.StatusEnum;
 import com.lunionlab.booking.form.CreateProfileForm;
+import com.lunionlab.booking.form.ProfileDocForm;
 import com.lunionlab.booking.form.UpdateProfileForm;
 import com.lunionlab.booking.models.ProfileModel;
 import com.lunionlab.booking.models.UserModel;
@@ -22,6 +27,7 @@ import com.lunionlab.booking.utilities.Utility;
 
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import net.coobird.thumbnailator.Thumbnails;
 
 @Service
 @Slf4j
@@ -31,6 +37,9 @@ public class ProfileService {
 
     @Autowired
     UserRepository userRepository;
+
+    @Autowired
+    GenericService genericService;
 
     public ProfileModel getProfileByEmail(String email) {
         return profileRepository.findFirstByEmailAndDeleted(email, DeletionEnum.DELETED_NO).orElse(null);
@@ -63,6 +72,10 @@ public class ProfileService {
             profile.setPhoneNumber(form.getPhoneNumber());
             profile = profileRepository.save(profile);
         }
+        Optional<UserModel> userOpt = userRepository.findFirstByEmailAndDeleted(profile.getEmail(),
+                DeletionEnum.DELETED_NO);
+        userOpt.get().setStatus(StatusEnum.OLD_USER);
+        userRepository.save(userOpt.get());
         log.info("creation du profile user" + " " + profile.getFirstName());
         return ResponseEntity.ok(profile);
     }
@@ -137,6 +150,88 @@ public class ProfileService {
             profile.setPhoneNumber(form.getPhoneNumber());
         }
         profile = profileRepository.save(profile);
+        return ResponseEntity.ok(profile);
+    }
+
+    public Object profileAvatar(MultipartFile avatar) {
+        ProfileModel profile = genericService.getUserAuth();
+        if (profile == null) {
+            log.error("profile not found");
+            return ResponseEntity.badRequest()
+                    .body(ReportError.message("message", "cet profile n'existe pas", "code", "PF10"));
+        }
+        MultipartFile avatarForm = avatar;
+        if (avatarForm.isEmpty() || avatarForm == null) {
+            return ResponseEntity.badRequest()
+                    .body(ReportError.message("message", "Veuillez soumettre votre image de profile", "code", "AV10"));
+        }
+        String filename = null;
+        if (avatarForm != null && !avatarForm.isEmpty()) {
+            filename = genericService.generateFileName("avatar");
+            File source = new File(filename);
+            try {
+                Thumbnails.of(avatarForm.getInputStream()).scale(1).outputQuality(0.5).toFile(source);
+                // avatarForm.transferTo(source.toPath());
+            } catch (IllegalStateException e) {
+                log.error("file not save");
+                e.printStackTrace();
+                return ResponseEntity.badRequest()
+                        .body(ReportError.message("message", "file not save", "code", "AV11"));
+            } catch (IOException e) {
+                log.error("file not save");
+                e.printStackTrace();
+                return ResponseEntity.badRequest()
+                        .body(ReportError.message("message", "file not save", "code", "AV11"));
+            }
+        }
+        // update profile avatar
+        profile.setAvatarUrl(filename);
+        profile = profileRepository.save(profile);
+        log.info("update user avatar table");
+        return ResponseEntity.ok(profile);
+    }
+
+    public Object profileDocument(MultipartFile documentUrl, @Valid ProfileDocForm form, BindingResult result) {
+        if (result.hasErrors()) {
+            log.error("mauvais format de données");
+            return ResponseEntity.badRequest().body(ReportError.getErrors(result));
+        }
+        ProfileModel profile = genericService.getUserAuth();
+        if (profile == null) {
+            log.error("profile not found");
+            return ResponseEntity.badRequest()
+                    .body(ReportError.message("message", "cet profile n'existe pas", "code", "PF10"));
+        }
+        MultipartFile documentForm = documentUrl;
+        if (documentForm.isEmpty() || documentForm == null) {
+            log.error("file is missing in request");
+            return ResponseEntity.badRequest()
+                    .body(ReportError.message("message", "Veuillez soumettre le document pdf", "code", "DOC10"));
+        }
+        String documentName = null;
+        if (!documentForm.isEmpty() && documentForm != null) {
+            String extension = genericService.getFileExtension(documentForm.getOriginalFilename());
+            if (!extension.equalsIgnoreCase("pdf")) {
+                log.error("need pdf file");
+                return ResponseEntity.badRequest()
+                        .body(ReportError.message("message", "Veuillez soumettre un document au format pdf", "code",
+                                "DOC19"));
+            }
+            try {
+                documentName = genericService.generateFileName(form.getDocumentType());
+                File documentPath = new File(documentName);
+                documentForm.transferTo(documentPath.toPath());
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.badRequest()
+                        .body(ReportError.message("message", "document not save", "code", "DOC11"));
+            }
+        }
+        // update profile document url
+        profile.setDocumentType(form.getDocumentType());
+        profile.setDocumentUrl(documentName);
+        profile = profileRepository.save(profile);
+        log.info("update profile document");
         return ResponseEntity.ok(profile);
     }
 }

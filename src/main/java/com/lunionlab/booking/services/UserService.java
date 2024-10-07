@@ -54,6 +54,9 @@ public class UserService {
     @Value("${code.opt.exp}")
     private Integer CODEOPTEXP;
 
+    @Value("${link.front}")
+    private String VERIFYLINK;
+
     @Autowired
     ProfileService profileService;
 
@@ -88,11 +91,16 @@ public class UserService {
             codeOtpRespository.save(saveCode);
             UserModel userM = new UserModel(form.getEmail(),
                     Utility.hashPassword(codeOtp), StatusEnum.NEW_USER);
-            userRepository.save(userM);
+            userM = userRepository.save(userM);
+            ProfileModel profileModel = new ProfileModel(null, null, null, null, null, userM.getEmail(), null, null,
+                    null, null,
+                    null, null, null);
+            profileRepository.save(profileModel);
         }
         log.info("generation de code otp");
         boolean sendMail = Utility.sendMailWithResend("support.lunionbooking@lunion-lab.com", form.getEmail(),
-                "Verify Email", codeOtp);
+                "Verify Email", codeOtp, VERIFYLINK + "auth?step=2",
+                "https://lunion-booking.vercel.app/images/logo_fn.svg");
         if (sendMail) {
             log.info("send mail");
         } else {
@@ -117,17 +125,25 @@ public class UserService {
         }
         CodeOtpModel codeOtpModel = codeOpt.get();
         UserModel userModel = this.getUserByEmail(codeOtpModel.getEmail());
+        ProfileModel profileModel = profileService.getProfileByEmail(userModel.getEmail());
         Date now = new Date();
 
         if (codeOtpModel.getExpiration().compareTo(now) < 0) {
             log.error("code expiré");
             return ResponseEntity.badRequest().body(ReportError.message("message", "le code a expiré", "code", "C10"));
         }
-        if (userModel.getStatus().intValue() == StatusEnum.NEW_USER.intValue()) {
+        if (userModel.getStatus().intValue() == StatusEnum.NEW_USER.intValue() && profileModel.getFirstName() == null
+                && profileModel.getLastName() == null && profileModel.getBirthDate() == null) {
             authRes.put("userState", "new");
-            userModel.setStatus(StatusEnum.OLD_USER);
-            userRepository.save(userModel);
-
+            String token = jwtService.generateToken(codeOtpModel.getEmail());
+            RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(codeOtpModel.getEmail());
+            AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
+            codeOtpRespository.delete(codeOtpModel);
+            authRes.put("accessToken", authResponse.getAccessToken());
+            authRes.put("refreshToken", authResponse.getRefreshToken());
+            return ResponseEntity.ok(authRes);
+        } else {
+            authRes.put("userState", "old");
             String token = jwtService.generateToken(codeOtpModel.getEmail());
             RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(codeOtpModel.getEmail());
             AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
@@ -136,17 +152,6 @@ public class UserService {
             authRes.put("refreshToken", authResponse.getRefreshToken());
             return ResponseEntity.ok(authRes);
         }
-
-        if (userModel.getStatus().intValue() == StatusEnum.OLD_USER.intValue()) {
-            authRes.put("userState", "old");
-        }
-        String token = jwtService.generateToken(codeOtpModel.getEmail());
-        RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(codeOtpModel.getEmail());
-        AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
-        codeOtpRespository.delete(codeOtpModel);
-        authRes.put("accessToken", authResponse.getAccessToken());
-        authRes.put("refreshToken", authResponse.getRefreshToken());
-        return ResponseEntity.ok(authRes);
     }
 
     public Object getUserAuth() {
@@ -176,10 +181,19 @@ public class UserService {
                     null, form.getAvatarUrl());
             profileModel = profileRepository.save(profileModel);
         }
-        if (userModel.getStatus().intValue() == StatusEnum.NEW_USER.intValue()) {
+        if (userModel.getStatus().intValue() == StatusEnum.NEW_USER.intValue() && profileModel.getFirstName() == null
+                && profileModel.getLastName() == null && profileModel.getBirthDate() == null) {
             response.put("userState", "new");
-            userModel.setStatus(StatusEnum.OLD_USER);
-            userRepository.save(userModel);
+
+            String token = jwtService.generateToken(userModel.getEmail());
+            RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(userModel.getEmail());
+            AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
+            response.put("accessToken", authResponse.getAccessToken());
+            response.put("refreshToken", authResponse.getRefreshToken());
+            return ResponseEntity.ok(response);
+        } else {
+
+            response.put("userState", "old");
 
             String token = jwtService.generateToken(userModel.getEmail());
             RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(userModel.getEmail());
@@ -188,15 +202,6 @@ public class UserService {
             response.put("refreshToken", authResponse.getRefreshToken());
             return ResponseEntity.ok(response);
         }
-        if (userModel.getStatus().intValue() == StatusEnum.OLD_USER.intValue()) {
-            response.put("userState", "old");
-        }
 
-        String token = jwtService.generateToken(userModel.getEmail());
-        RefreshTokenModel refreshTokenModel = refreshTokenService.createRefreshToken(userModel.getEmail());
-        AuthResponse authResponse = new AuthResponse(token, refreshTokenModel.getToken());
-        response.put("accessToken", authResponse.getAccessToken());
-        response.put("refreshToken", authResponse.getRefreshToken());
-        return ResponseEntity.ok(response);
     }
 }
