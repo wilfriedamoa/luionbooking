@@ -219,7 +219,7 @@ public class ProfileService {
             }
             try {
                 documentName = genericService.generateFileName(form.getDocumentType());
-                File documentPath = new File(documentName);
+                File documentPath = new File(documentName + "." + extension);
                 documentForm.transferTo(documentPath.toPath());
             } catch (Exception e) {
                 e.printStackTrace();
